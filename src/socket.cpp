@@ -39,7 +39,13 @@ int Socket::receive_bytes(uint8_t* buffer, int buffer_capacity) {
 }
 
 int Socket::receive_batch(struct mmsghdr* message_vector, int message_count) {
-    return -1;
+    if (fd < 0) {
+        return -1;
+    }
+
+    // MSG_WAITFORONE: block until >=1 packet arrives
+    // then return quickly
+    return ::recvmmsg(fd, message_vector, (unsigned int)message_count, MSG_WAITFORONE, 0);
 }
 
 bool Socket::set_receive_buffer(int receive_buffer_bytes) {
