@@ -45,6 +45,24 @@ bool Socket::connect_socket(const std::string& mcast_ip, uint16_t mcast_port,
         return false;
     }
 
+    // SSM (Source Specific Multicast)
+    if (!source_ip.empty()) {
+        ip_mreq_source multicast_request;
+        std::memset(&multicast_request, 0, sizeof(multicast_request));
+        multicast_request.imr_multiaddr.s_addr = ::inet_addr(mcast_ip.c_str());
+        multicast_request.imr_interface.s_addr = ::inet_addr(interface_ip.c_str());
+        multicast_request.imr_sourceaddr.s_addr = ::inet_addr(source_ip.c_str());
+
+        if (::setsockopt(fd, IPPROTO_IP, IP_ADD_SOURCE_MEMBERSHIP,
+                         &multicast_request, sizeof(multicast_request)) < 0) {
+            close();
+            return false;
+        }
+        
+        std::printf("INFO : Joined : %s Source: %s\n", mcast_ip.c_str(), source_ip.c_str());
+        return true;
+    }
+
     // ASM (Any Source Multicast)
     ip_mreq multicast_request;
     std::memset(&multicast_request, 0, sizeof(multicast_request));
