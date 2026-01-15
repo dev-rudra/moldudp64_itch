@@ -39,7 +39,15 @@ int Socket::receive_batch(struct mmsghdr* message_vector, int message_count) {
 }
 
 bool Socket::set_receive_buffer(int receive_buffer_bytes) {
-    return false;
+    if (fd < 0) {
+        return false;
+    }
+
+    if (::setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &receive_buffer_bytes, sizeof(receive_buffer_bytes)) < 0) {
+        return false;
+    }
+
+    return true;
 }
 
 
