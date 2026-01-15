@@ -2,6 +2,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
 #include <cstring>
 
 Socket::Socket() : fd(-1) {}
@@ -44,6 +45,19 @@ bool Socket::connect_socket(const std::string& mcast_ip, uint16_t mcast_port,
         return false;
     }
 
+    // ASM (Any Source Multicast)
+    ip_mreq multicast_request;
+    std::memset(&multicast_request, 0, sizeof(multicast_request));
+    multicast_request.imr_multiaddr.s_addr = ::inet_addr(mcast_ip.c_str());
+    multicast_request.imr_interface.s_addr = ::inet_addr(interface_ip.c_str());
+
+    if (::setsockopt(fd, IPPROTO_IP, IP_ADD_MEMBERSHIP,
+                     &multicast_request, sizeof(multicast_request)) < 0) {
+        close();
+        return false;
+    }
+
+    std::printf("INFO : Joined : %s\n", mcast_ip.c_str());
     return true;
 }
 
