@@ -19,7 +19,9 @@ public:
     
     // Receive up to message_count datagrams using recvmmsg().
     // Returns packets received, or -1 on error.
+    #ifdef __linux__
     int receive_batch(struct mmsghdr* message_vector, int message_count);
+    #endif
 
     // Set SO_RCVBUF size.
     // Returns true on success.
