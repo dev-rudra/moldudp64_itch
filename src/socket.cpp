@@ -1,6 +1,8 @@
 #include "socket.h"
 #include <sys/socket.h>
 #include <unistd.h>
+#include <netinet/in.h>
+#include <cstring>
 
 Socket::Socket() : fd(-1) {}
 
@@ -24,6 +26,17 @@ bool Socket::connect_socket(const std::string& mcast_ip, uint16_t mcast_port,
 
     fd = ::socket(AF_INET, SOCK_DGRAM, 0);
     if (fd < 0) {
+        return false;
+    }
+
+    sockaddr_in local_addr;
+    std::memset(&local_addr, 0, sizeof(local_addr));
+    local_addr.sin_family = AF_INET;
+    local_addr.sin_port = htons(mcast_port);
+    local_addr.sin_addr.s_addr = INADDR_ANY;
+
+    if (::bind(fd, (sockaddr*)&local_addr, sizeof(local_addr)) <0) {
+        close();
         return false;
     }
 
