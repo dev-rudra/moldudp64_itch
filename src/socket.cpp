@@ -31,7 +31,11 @@ bool Socket::connect_socket(const std::string& mcast_ip, uint16_t mcast_port,
 }
 
 int Socket::receive_bytes(uint8_t* buffer, int buffer_capacity) {
-    return -1;
+    if (fd < 0) {
+        return -1;
+    }
+
+    return (int)::recvfrom(fd, buffer, (size_t)buffer_capacity, 0, 0, 0);
 }
 
 int Socket::receive_batch(struct mmsghdr* message_vector, int message_count) {
