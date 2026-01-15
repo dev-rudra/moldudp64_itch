@@ -29,6 +29,10 @@ bool Socket::connect_socket(const std::string& mcast_ip, uint16_t mcast_port,
         return false;
     }
 
+    // Allow multi-listner
+    int reuse = 1;
+    ::setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
+
     sockaddr_in local_addr;
     std::memset(&local_addr, 0, sizeof(local_addr));
     local_addr.sin_family = AF_INET;
