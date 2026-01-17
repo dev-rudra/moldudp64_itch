@@ -4,6 +4,9 @@
 #include <string>
 #include <cctype>
 #include <cstdlib>
+#include <nlohmann/json.hpp>
+
+using json = nlohmann::json;
 
 static AppConfig app_config;
 
@@ -26,6 +29,86 @@ static std::string to_upper_case(const std::string& s) {
     }
     return out;
 }
+
+static std::string config_absolute_path(const char* config_path, const std::string& path_from_ini) {
+    if (path_from_ini.empty()) {
+        return "";
+    }
+
+    if (path_from_ini[0] == '/') {
+        return path_from_ini;
+    }
+
+    std::string config_file = config_path;
+    size_t last_slash = config_file.find_last_of('/');
+    if (last_slash == std::string::npos) {
+        return path_from_ini;
+    }
+
+    std::string config_dir = config_file.substr(0, last_slash);
+    return config_dir + "/" + path_from_ini;
+}
+
+static FieldType parse_field_type(const std::string& s) {
+    if (s == "char")   return CHAR;
+    if (s == "uint8")  return UINT8;
+    if (s == "uint16") return UINT16;
+    if (s == "uint32") return UINT32;
+    if (s == "uint64") return UINT64;
+    if (s == "int16")  return INT16;
+    if (s == "int32")  return INT32;
+    if (s == "int64")  return INT64;
+    if (s == "string") return STRING;
+    if (s == "binary") return BINARY;
+    return STRING;
+}
+
+static bool load_spec(const std::string& spec_path, AppConfig* cfg) {
+    std::ifstream file(spec_path.c_str());
+    if (!file) {
+        return false;
+    }
+
+    json root;
+    file >> root;
+
+    cfg->msg_specs.clear();
+
+    for (json::iterator it = root.begin(); it != root.end(); ++it) {
+        std::string msg_key = it.key();
+
+        if (msg_key.size() != 1) {
+            continue;
+        }
+
+        const json& obj = it.value();
+
+        MsgSpec msg;
+        msg.msg_type = msg_key[0];
+        msg.name = obj.value("name", "");
+
+        uint32_t offset = 0;
+        const json& fields = obj["fields"];
+        for (size_t i = 0; i < fields.size(); i++) {
+            const json& json_file = fields[i];
+
+            FieldSpec field_spec;
+            field_spec.name = json_file.value("name", "");
+            field_spec.type = parse_field_type(json_file.value("type", "string"));
+            field_spec.size = (uint32_t)json_file.value("size", 0);
+            field_spec.offset = offset;
+
+            offset += field_spec.size;
+            msg.fields.push_back(field_spec);
+        }
+
+        msg.total_length = offset;
+        cfg->msg_specs[msg.msg_type] = msg;
+    }
+
+    return true;
+}
+
 
 bool load_config(const char* config_path) {
     AppConfig cfg;
@@ -73,6 +156,7 @@ bool load_config(const char* config_path) {
             else if (key == "interface_ip") cfg.interface_ip = val;
             else if (key == "mcast_rerequester_ip") cfg.mcast_rerequester_ip = val;
             else if (key == "mcast_rerequester_port") cfg.mcast_rerequester_port = (uint16_t)std::atoi(val.c_str());
+            else if (key == "protocol_spec") cfg.protocol_spec = val;
         }
         else if (section == "RECOVERY_SETTINGS") {
             if (key == "max_recovery_message_count") {
@@ -84,6 +168,11 @@ bool load_config(const char* config_path) {
     if (cfg.mcast_ip.empty()) return false;
     if (cfg.mcast_port == 0) return false;
     if (cfg.interface_ip.empty()) return false;
+    if (cfg.protocol_spec.empty()) return false;
+
+    cfg.protocol_spec = config_absolute_path(config_path, cfg.protocol_spec);
+
+    if (!load_spec(cfg.protocol_spec, &cfg)) return false;
 
     app_config = cfg;
     return true;
