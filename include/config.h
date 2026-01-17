@@ -3,6 +3,37 @@
 
 #include <cstdint>
 #include <string>
+#include <unordered_map>
+#include <vector>
+
+enum FieldType {
+    CHAR,
+    UINT8,
+    UINT16,
+    UINT32,
+    UINT64,
+    INT16,
+    INT32,
+    INT64,
+    STRING,
+    BINARY
+};
+
+struct FieldSpec {
+    std::string name;
+    FieldType type;
+    uint32_t size;
+    uint32_t offset;
+};
+
+struct MsgSpec {
+    char msg_type;
+    std::string name;
+    uint32_t total_length;
+    std::vector<FieldSpec> fields;
+
+    MsgSpec() : msg_type(0), total_length(0) {}
+};
 
 struct AppConfig {
     std::string mcast_ip;
@@ -15,6 +46,10 @@ struct AppConfig {
     uint16_t mcast_rerequester_port;
 
     uint16_t max_recovery_message_count;
+
+    std::string protocol_spec;
+
+    std::unordered_map<char, MsgSpec> msg_specs;
 
     AppConfig()
         : mcast_port(0),
