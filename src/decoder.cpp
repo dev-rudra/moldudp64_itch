@@ -48,3 +48,36 @@ bool parse_mold_header(const uint8_t* packet, int packet_len, MoldHeader* out) {
 
     return true;
 }
+
+bool next_mold_message(const uint8_t* packet, int packet_len, int* offset,
+                       uint16_t* remaining, const uint8_t** msg, uint16_t* msg_len) {
+
+    if (!packet || !offset || !remaining || !msg || !msg_len) {
+        return false;
+    }
+
+    if (*remaining ==0) {
+        return false;
+    }
+
+    int pos = *offset;
+
+    if (pos + 2 > packet_len) {
+        return false;
+    }
+
+    uint16_t length = read_u16_big_endian(packet + pos);
+    pos += 2;
+
+    if (pos + (int)length > packet_len) {
+        return false;
+    }
+
+    *msg = packet + pos;
+    *msg_len = length;
+
+    *remaining = (uint16_t)(*remaining -1);
+    *offset = pos + (int)length;
+
+    return true;
+}
