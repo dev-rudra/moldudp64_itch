@@ -49,12 +49,13 @@ struct AppConfig {
 
     std::string protocol_spec;
 
+    // Load spec
     std::unordered_map<char, MsgSpec> msg_specs;
+    
+    // Fast lookup by message type
+    const MsgSpec* spec_by_type[256];
 
-    AppConfig()
-        : mcast_port(0),
-          mcast_rerequester_port(0),
-          max_recovery_message_count(5000) {}
+    AppConfig();
 };
 
 bool load_config(const char* config_path);

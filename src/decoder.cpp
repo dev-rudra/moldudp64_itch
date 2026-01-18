@@ -1,7 +1,6 @@
 #include "decoder.h"
 
-#include <cstdint>
-#include <string>
+#include <cstdio>
 
 // Read 2 bytes as big-endian (network order)
 // unsigned 16-bit value.
@@ -78,6 +77,35 @@ bool next_mold_message(const uint8_t* packet, int packet_len, int* offset,
 
     *remaining = (uint16_t)(*remaining -1);
     *offset = pos + (int)length;
+
+    return true;
+}
+
+bool decode_itch_message(const uint8_t* msg, uint16_t msg_len,
+                         const AppConfig& cfg, uint64_t seq) {
+
+    if (!msg || msg_len == 0) {
+        return false;
+    }
+
+    char msg_type = (char)msg[0];
+    const MsgSpec* spec = cfg.spec_by_type[(unsigned char)msg_type];
+
+    if (!spec) {
+        std::printf("itch type=%c seq=%llu len=%u spec=UNKNOWN\n",
+            msg_type,
+            (unsigned long long)seq,
+            (unsigned)msg_len);
+
+        return false;
+    }
+
+    std::printf("itch type=%c name=%s seq=%llu len=%u expected=%u\n",
+                msg_type,
+                spec->name.c_str(),
+                (unsigned long long)seq,
+                (unsigned)msg_len,
+                (unsigned)spec->total_length);
 
     return true;
 }

@@ -8,6 +8,13 @@
 
 using json = nlohmann::json;
 
+AppConfig::AppConfig()
+    : mcast_port(0),
+      mcast_rerequester_port(0),
+      max_recovery_message_count(5000) {
+    std::memset(spec_by_type, 0, sizeof(spec_by_type));
+}
+
 static AppConfig app_config;
 
 static std::string trim(const std::string& s) {
@@ -73,6 +80,7 @@ static bool load_spec(const std::string& spec_path, AppConfig* cfg) {
     file >> root;
 
     cfg->msg_specs.clear();
+    std::memset(cfg->spec_by_type, 0, sizeof(cfg->spec_by_type));
 
     for (json::iterator it = root.begin(); it != root.end(); ++it) {
         std::string msg_key = it.key();
@@ -104,6 +112,7 @@ static bool load_spec(const std::string& spec_path, AppConfig* cfg) {
 
         msg.total_length = offset;
         cfg->msg_specs[msg.msg_type] = msg;
+        cfg->spec_by_type[(unsigned char)msg.msg_type] = &cfg->msg_specs[msg.msg_type];
     }
 
     return true;
