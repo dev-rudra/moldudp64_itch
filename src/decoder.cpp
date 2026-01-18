@@ -32,6 +32,56 @@ static uint64_t read_u64_big_endian(const uint8_t* bytes) {
            (b7 << 0);
 }
 
+static uint32_t read_u32_big_endian(const uint8_t* bytes) {
+    uint32_t b0 = (uint32_t)bytes[0];
+    uint32_t b1 = (uint32_t)bytes[1];
+    uint32_t b2 = (uint32_t)bytes[2];
+    uint32_t b3 = (uint32_t)bytes[3];
+
+    return (b0 << 24) |
+           (b1 << 16) |
+           (b2 << 8)  |
+           (b3 << 0);
+}
+
+static void print_field_value(FieldType type, const uint8_t* field_data, uint32_t size) {
+    switch (type) {
+        case STRING:
+            std::printf("%.*s", (int)size, (const char*)field_data);
+            return;
+        case CHAR:
+            std::printf("%c", (char)field_data[0]);
+            return;
+        case UINT8:
+            std::printf("%u", (unsigned)field_data[0]);
+            return;
+        case UINT16:
+            std::printf("%u", (unsigned)read_u16_big_endian(field_data));
+            return;
+        case UINT32:
+            std::printf("%u", (unsigned)read_u32_big_endian(field_data));
+            return;
+        case UINT64:
+            std::printf("%llu", (unsigned long long)read_u64_big_endian(field_data));
+            return;
+        case INT16:
+            std::printf("%d", (int)(int16_t)read_u16_big_endian(field_data));
+            return;
+        case INT32:
+            std::printf("%d", (int)(int32_t)read_u32_big_endian(field_data));
+            return;
+        case INT64:
+            std::printf("%lld", (long long)(int64_t)read_u64_big_endian(field_data));
+            return;
+        case BINARY:
+        default:
+            for (uint32_t i = 0; i < size; i++) {
+                std::printf("%02X", (unsigned)field_data[i]);
+            }
+            return;
+    }
+}
+
 bool parse_mold_header(const uint8_t* packet, int packet_len, MoldHeader* out) {
     if (!packet) return false;
     if (!out) return false;
@@ -82,7 +132,8 @@ bool next_mold_message(const uint8_t* packet, int packet_len, int* offset,
 }
 
 bool decode_itch_message(const uint8_t* msg, uint16_t msg_len,
-                         const AppConfig& cfg, uint64_t seq) {
+                         const AppConfig& cfg, const std::string& session,
+                         uint64_t seq, uint16_t packet_msg_count) {
 
     if (!msg || msg_len == 0) {
         return false;
@@ -91,21 +142,29 @@ bool decode_itch_message(const uint8_t* msg, uint16_t msg_len,
     char msg_type = (char)msg[0];
     const MsgSpec* spec = cfg.spec_by_type[(unsigned char)msg_type];
 
-    if (!spec) {
-        std::printf("itch type=%c seq=%llu len=%u spec=UNKNOWN\n",
-            msg_type,
-            (unsigned long long)seq,
-            (unsigned)msg_len);
+    std::printf(">> {'%.*s', %llu, %u",
+                (int)session.size(), session.c_str(),
+                (unsigned long long)seq,
+                (unsigned)packet_msg_count);
 
+    if (!spec) {
+        std::printf(", 'Unknown'}\n");
         return false;
     }
 
-    std::printf("itch type=%c name=%s seq=%llu len=%u expected=%u\n",
-                msg_type,
-                spec->name.c_str(),
-                (unsigned long long)seq,
-                (unsigned)msg_len,
-                (unsigned)spec->total_length);
+    for (size_t i = 0; i < spec->fields.size(); i++) {
+        const FieldSpec& field = spec->fields[i];
 
+        if (field.offset + field.size > msg_len) {
+            std::printf(", 'TRUNC'}\n");
+            return false;
+        }
+
+        const uint8_t* field_data = msg + field.offset;
+        std::printf(", '");
+        print_field_value(field.type, field_data, field.size);
+        std::printf("'");
+    }
+    std::printf("}\n");
     return true;
 }

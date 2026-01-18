@@ -37,7 +37,7 @@ int Application::run() {
         }
 
         MoldHeader header;
-        if (!parse_mold_haader(buffer, bytes, &header)) {
+        if (!parse_mold_header(buffer, bytes, &header)) {
             continue;
         }
 
@@ -51,7 +51,7 @@ int Application::run() {
             uint64_t seq = header.sequence_number + (uint64_t)index;
             index++;
 
-            decode_itch_message(msg, msg_len, cfg, seq);
+            decode_itch_message(msg, msg_len, cfg, header.session, seq, header.message_count);
         }
     }
 

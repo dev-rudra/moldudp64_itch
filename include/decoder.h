@@ -18,7 +18,11 @@ bool next_mold_message(const uint8_t* packet,
                        uint16_t* remaining, const uint8_t** msg,
                        uint16_t* msg_len);
 
-bool decode_itch_message(const uint8_t* msg, uint16_t msg_len, const AppConfig& cfg,
-                         uint64_t seq);
+bool decode_itch_message(const uint8_t* msg,
+                         uint16_t msg_len,
+                         const AppConfig& cfg,
+                         const std::string& session,
+                         uint64_t seq,
+                         uint16_t packet_msg_count);
 
 #endif

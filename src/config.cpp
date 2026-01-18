@@ -181,9 +181,11 @@ bool load_config(const char* config_path) {
 
     cfg.protocol_spec = config_absolute_path(config_path, cfg.protocol_spec);
 
-    if (!load_spec(cfg.protocol_spec, &cfg)) return false;
-
     app_config = cfg;
+    if (!load_spec(app_config.protocol_spec, &app_config)) {
+        return false;
+    }
+
     return true;
 }
 
