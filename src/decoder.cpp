@@ -148,7 +148,16 @@ bool decode_itch_message(const uint8_t* msg, uint16_t msg_len,
                 (unsigned)packet_msg_count);
 
     if (!spec) {
-        std::printf(", 'Unknown'}\n");
+        std::printf(", 'Unknown(type=%c)'}\n", msg_type);
+        return false;
+    }
+
+    // Validate MsgLength with Spec TotlaLength (if length is in the spec)
+    if (spec->total_length != 0 && msg_len != (uint16_t)spec->total_length) {
+        std::printf(", 'Length Mismatch', 'exp=%u', 'got=%u'}\n",
+                    (unsigned)spec->total_length,
+                    (unsigned)msg_len);
+
         return false;
     }
 
@@ -156,7 +165,9 @@ bool decode_itch_message(const uint8_t* msg, uint16_t msg_len,
         const FieldSpec& field = spec->fields[i];
 
         if (field.offset + field.size > msg_len) {
-            std::printf(", 'TRUNC'}\n");
+            std::printf(", 'TRUNC', 'need=%u', 'got=%u'}\n",
+                        (unsigned)(field.offset + field.size),
+                        (unsigned)msg_len);
             return false;
         }
 
