@@ -5,6 +5,48 @@
 
 #include <cstdio>
 #include <cstdint>
+#include <string>
+
+static void check_sequence_gap(const MoldHeader& header,
+                               std::string& current_session,
+                               bool& joined, uint64_t& expected_seq) {
+
+    if (!joined) {
+        current_session = header.session;
+        expected_seq = header.sequence_number;
+        joined = true;
+        return;
+    }
+
+    if (header.session != current_session) {
+        std::printf("Session Change from =%.*s to=%.*s seq=%llu\n",
+                    (int)current_session.size(), current_session.c_str(),
+                    (int)header.session.size(), header.session.c_str(),
+                    (unsigned long long)header.sequence_number);
+
+        current_session = header.session;
+        expected_seq = header.sequence_number;
+        return;
+    }
+
+    if (header.sequence_number > expected_seq) {
+        uint64_t missing = header.sequence_number - expected_seq;
+        std::printf("Gap session=%.*s expected=%llu got=%llu missing=%llu\n",
+                    (int)header.session.size(), header.session.c_str(),
+                    (unsigned long long)expected_seq,
+                    (unsigned long long)header.sequence_number,
+                    (unsigned long long)missing);
+        return;
+    }
+
+    if (header.sequence_number < expected_seq) {
+        std::printf("Duplicate session=%.*s expected=%llu got=%llu\n",
+                    (int)header.session.size(), header.session.c_str(),
+                    (unsigned long long)expected_seq,
+                    (unsigned long long)header.sequence_number);
+        return;
+    }
+}
 
 int Application::run() {
     const char* config_path = "config/config.ini";
@@ -28,6 +70,10 @@ int Application::run() {
     const int buffer_capacity = 64 * 1024;
     uint8_t buffer[buffer_capacity];
 
+    std::string current_session;
+    bool joined = false;
+    uint64_t expected_seq = 0;
+
     std::printf("Listening... (Ctrl+C to stop)\n");
 
     while (1) {
@@ -40,6 +86,8 @@ int Application::run() {
         if (!parse_mold_header(buffer, bytes, &header)) {
             continue;
         }
+
+        check_sequence_gap(header, current_session, joined, expected_seq);
 
         int offset = 10 + 8 + 2;
         uint16_t remaining = header.message_count;
