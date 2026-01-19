@@ -7,6 +7,18 @@
 #include <cstdint>
 #include <string>
 
+Application::Application()
+: max_messages(0),
+  verbose(false) {}
+
+void Application::set_max_messages(uint64_t value) {
+    max_messages = value;
+}
+
+void Application::set_verbose(bool value) {
+    verbose = value;
+}
+
 static void check_sequence_gap(const MoldHeader& header,
                                std::string& current_session,
                                bool& joined, uint64_t& expected_seq) {
@@ -59,6 +71,10 @@ int Application::run() {
 
     std::printf("mcast_ip: %s\n", cfg.mcast_ip.c_str());
 
+    if (verbose) {
+        std::printf("verbose on\n");
+    }
+
     Socket sock;
 
     if (!sock.connect_socket(cfg.mcast_ip, cfg.mcast_port, cfg.interface_ip, cfg.mcast_source_ip)) {
@@ -73,6 +89,8 @@ int Application::run() {
     std::string current_session;
     bool joined = false;
     uint64_t expected_seq = 0;
+
+    uint64_t decoded_msg_count = 0;
 
     std::printf("Listening... (Ctrl+C to stop)\n");
 
@@ -98,9 +116,18 @@ int Application::run() {
         while (next_mold_message(buffer, bytes, &offset, &remaining, &msg, &msg_len)) {
             uint64_t seq = header.sequence_number + (uint64_t)index;
             index++;
-
+            
             decode_itch_message(msg, msg_len, cfg, header.session, seq, header.message_count);
+
+            decoded_msg_count++;
+            if (max_messages != 0 && decoded_msg_count >= max_messages) {
+                std::printf("Stop: Message Decode Count=%llu\n", (unsigned long long)decoded_msg_count);
+                sock.close();
+                return 0;
+            }
         }
+        
+        expected_seq = header.sequence_number + (uint64_t)header.message_count;
     }
 
     sock.close();
