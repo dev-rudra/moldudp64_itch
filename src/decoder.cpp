@@ -154,18 +154,18 @@ bool decode_itch_message(const uint8_t* msg, uint16_t msg_len,
 
     // Validate MsgLength with Spec TotlaLength (if length is in the spec)
     if (spec->total_length != 0 && msg_len != (uint16_t)spec->total_length) {
-        std::printf(", 'Length Mismatch', 'exp=%u', 'got=%u'}\n",
+        std::printf(", 'Length Mismatch', 'type=%c', 'exp=%u', 'got=%u'",
+                    msg_type,
                     (unsigned)spec->total_length,
                     (unsigned)msg_len);
-
-        return false;
     }
 
     for (size_t i = 0; i < spec->fields.size(); i++) {
         const FieldSpec& field = spec->fields[i];
 
         if (field.offset + field.size > msg_len) {
-            std::printf(", 'TRUNC', 'need=%u', 'got=%u'}\n",
+            std::printf(", 'TRUNC', 'type=%c', 'need=%u', 'got=%u'}\n",
+                        msg_type,
                         (unsigned)(field.offset + field.size),
                         (unsigned)msg_len);
             return false;
