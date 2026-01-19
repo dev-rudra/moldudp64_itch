@@ -4,15 +4,17 @@
 #include <cstring>
 #include <stdint.h>
 #include <unistd.h>
+#include <getopt.h>
 
 static void usage(const char* prog) {
     std::fprintf(stderr,
-            "Usage: %s [-g] [-s <seq>] [-n <count>] [-v]\n\n"
+            "Usage: %s [-g] [-s <seq>] [-n <count>] [-v] [--type <X> ...]\n\n"
             "Options:\n"
             "   -g              gap-fill mode\n"
             "   -s <seq>        get data starting at <seq>\n"
             "   -n <count>      stops after decoding <count> msg\n"
             "   -v              verbose mode\n"
+            "   --type <X>      filter message type <X> (repeatable)\n"
             "   -h              show help\n",
             prog);
 }
@@ -24,8 +26,29 @@ int main(int argc, char** argv) {
     uint64_t start_seq = 0;
     bool has_start_seq = false;
 
+    Application app;
+
+    static struct option long_options[] = {
+        {"type", required_argument, 0, 1000},
+        {0, 0, 0, 0}
+    };
+
     int opt;
-    while ((opt = getopt(argc, argv, "gs:n:vh")) != -1) {
+    int long_index = 0;
+
+    while ((opt = getopt_long(argc, argv, "gs:n:vh", long_options, &long_index)) != -1) {
+        if (opt == 1000) {
+            // --type
+            if (!optarg || std::strlen(optarg) != 1) {
+                std::fprintf(stderr, "Invalid --type value (expect single char): %s\n",
+                        optarg ? optarg : "(null)");
+                usage(argv[0]);
+                return 1;
+            }
+            app.set_type_filter(optarg[0]);
+            continue;
+        }
+
         switch (opt) {
             case 'g':
                 enable_recovery = true;
@@ -70,7 +93,6 @@ int main(int argc, char** argv) {
         }
     }
 
-    Application app;
     app.set_max_messages(max_messages);
     app.set_verbose(verbose);
 

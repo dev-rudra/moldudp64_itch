@@ -6,10 +6,14 @@
 #include <cstdio>
 #include <cstdint>
 #include <string>
+#include <cstring>
 
 Application::Application()
 : max_messages(0),
-  verbose(false) {}
+  verbose(false),
+  has_type_filter(false) {
+    std::memset(type_allowed, 0, sizeof(type_allowed));
+}
 
 void Application::set_max_messages(uint64_t value) {
     max_messages = value;
@@ -17,6 +21,14 @@ void Application::set_max_messages(uint64_t value) {
 
 void Application::set_verbose(bool value) {
     verbose = value;
+}
+
+void Application::set_type_filter(char type) {
+    if (!has_type_filter) {
+        std::memset(type_allowed, 0, sizeof(type_allowed));
+        has_type_filter = true;
+    }
+    type_allowed[(unsigned char)type] = true;
 }
 
 static void check_sequence_gap(const MoldHeader& header,
@@ -116,8 +128,15 @@ int Application::run() {
         while (next_mold_message(buffer, bytes, &offset, &remaining, &msg, &msg_len)) {
             uint64_t seq = header.sequence_number + (uint64_t)index;
             index++;
-            
-            decode_itch_message(msg, msg_len, cfg, header.session, seq, header.message_count);
+
+            bool allow = true;
+            if (has_type_filter) {
+                allow = type_allowed[(unsigned char)msg[0]];
+            }
+
+            if (allow) {
+                decode_itch_message(msg, msg_len, cfg, header.session, seq, header.message_count);
+            }
 
             decoded_msg_count++;
             if (max_messages != 0 && decoded_msg_count >= max_messages) {
