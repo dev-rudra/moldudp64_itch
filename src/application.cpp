@@ -269,10 +269,12 @@ int Application::run() {
                     if (errno == EAGAIN || errno == EWOULDBLOCK) {
                         timeouts++;
                         if (timeouts >= 3) {
-                            std::printf("Recovery timeout seq=%llu got=%llu req=%u\n",
-                                        (unsigned long long)current_seq,
-                                        (unsigned long long)got_in_chunk,
-                                        (unsigned)req_count);
+                            if (got_in_chunk == 0) {
+                                std::printf("Recovery timeout seq=%llu got=%llu req=%u\n",
+                                            (unsigned long long)current_seq,
+                                            (unsigned long long)got_in_chunk,
+                                            (unsigned)req_count);
+                            }
                             break;
                         }
                         continue;
