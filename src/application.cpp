@@ -98,7 +98,7 @@ static uint16_t decode_packet_messages(const uint8_t* buffer, int bytes,
                                       const AppConfig& cfg, bool has_type_filter,
                                       const bool type_allowed[256],
                                       uint64_t& decoded_count,
-                                      uint64_t max_messages_limit, bool& stop_now) {
+                                      uint64_t max_messages_limit, bool& stop_now, bool verbose) {
 
     stop_now = false;
 
@@ -125,7 +125,7 @@ static uint16_t decode_packet_messages(const uint8_t* buffer, int bytes,
         }
 
         if (allow_print) {
-            decode_itch_message(msg, msg_len, cfg, header.session, seq, (uint16_t)header.message_count);
+            decode_itch_message(msg, msg_len, cfg, header.session, seq, (uint16_t)header.message_count, verbose);
         }
 
         decoded_count++;
@@ -283,7 +283,7 @@ int Application::run() {
 
                 bool stop_now = false;
                 uint16_t processed = decode_packet_messages(rxbuf, n, cfg, has_type_filter, type_allowed,
-                                                           decoded_count, max_messages, stop_now);
+                                                           decoded_count, max_messages, stop_now, verbose);
 
                 got_in_chunk += (uint64_t)processed;
 
@@ -362,7 +362,7 @@ int Application::run() {
         // Decode the packet's message
         bool stop_now = false;
         decode_packet_messages(buffer, bytes, cfg, has_type_filter, type_allowed,
-                               decoded_count, max_messages, stop_now);
+                               decoded_count, max_messages, stop_now, verbose);
 
         // Expected next packet startseq
         expected_seq = header.sequence_number + (uint64_t)header.message_count;

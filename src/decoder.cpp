@@ -133,7 +133,7 @@ bool next_mold_message(const uint8_t* packet, int packet_len, int* offset,
 
 bool decode_itch_message(const uint8_t* msg, uint16_t msg_len,
                          const AppConfig& cfg, const std::string& session,
-                         uint64_t seq, uint16_t packet_msg_count) {
+                         uint64_t seq, uint16_t packet_msg_count, bool verbose) {
 
     if (!msg || msg_len == 0) {
         return false;
@@ -173,6 +173,12 @@ bool decode_itch_message(const uint8_t* msg, uint16_t msg_len,
 
         const uint8_t* field_data = msg + field.offset;
         std::printf(", '");
+
+        // verbose print
+        if (verbose) {
+            std::printf("%s=", field.name.c_str());
+        }
+
         print_field_value(field.type, field_data, field.size);
         std::printf("'");
     }

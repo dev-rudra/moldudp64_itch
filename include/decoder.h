@@ -23,6 +23,6 @@ bool decode_itch_message(const uint8_t* msg,
                          const AppConfig& cfg,
                          const std::string& session,
                          uint64_t seq,
-                         uint16_t packet_msg_count);
+                         uint16_t packet_msg_count, bool verbose);
 
 #endif
