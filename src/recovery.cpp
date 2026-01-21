@@ -10,8 +10,8 @@
 #pragma pack(push, 1)
 struct RerequestPacket {
     char session[10];
-    uint8_t sequence[8];
-    uint8_t count[2];
+    uint64_t sequence;
+    uint16_t count;
 };
 #pragma pack(pop)
 
