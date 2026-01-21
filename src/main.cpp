@@ -97,6 +97,7 @@ int main(int argc, char** argv) {
         app.set_start_seq(start_seq);
     }
 
+    app.set_enable_recovery(enable_recovery);
     app.set_max_messages(max_messages);
     app.set_verbose(verbose);
 

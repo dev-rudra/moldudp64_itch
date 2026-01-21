@@ -11,6 +11,7 @@ public:
     void set_verbose(bool value);
     void set_type_filter(char type);
     void set_start_seq(uint64_t value);
+    void set_enable_recovery(bool value);
 
     int run();
 
@@ -22,6 +23,8 @@ private:
 
     bool has_start_seq;
     uint64_t start_seq;
+
+    bool enable_recovery;
 };
 
 #endif

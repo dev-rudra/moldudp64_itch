@@ -15,7 +15,8 @@ Application::Application()
   verbose(false),
   has_type_filter(false),
   has_start_seq(false),
-  start_seq(0) {
+  start_seq(0),
+  enable_recovery(false) {
     std::memset(type_allowed, 0, sizeof(type_allowed));
 }
 
@@ -35,6 +36,10 @@ void Application::set_type_filter(char type) {
 void Application::set_start_seq(uint64_t value) {
     has_start_seq = true;
     start_seq = value;
+}
+
+void Application::set_enable_recovery(bool value) {
+    enable_recovery = value;
 }
 
 static void check_sequence_gap(const MoldHeader& header,
