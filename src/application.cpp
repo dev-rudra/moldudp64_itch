@@ -490,11 +490,6 @@ int Application::run() {
         // Gap/Duplicate/SessionChange
         check_sequence_gap(header, current_session, joined, expected_seq);
 
-        // Decode the packet's message
-        bool stop_now = false;
-        decode_packet_messages(buffer, bytes, cfg, has_type_filter, type_allowed,
-                               decoded_count, max_messages, stop_now, verbose);
-
         // Gap-fill
         if (enable_recovery && rr_open && joined &&
             header.session == current_session &&
@@ -514,31 +509,37 @@ int Application::run() {
             }
 
             std::memcpy(session, header.session.data(), session_length);
-
-            std::printf("Recovery gap_fill start=%llu missing=%llu\n",
-                        (unsigned long long)gap_start,
-                        (unsigned long long)gap_count);
+            std::printf(">> Start recovering ...\n");
 
             bool gap_stop_now = false;
-            gap_fill(rr, session, gap_start, gap_count,
+            uint64_t recovered_count = gap_fill(rr, session, gap_start, gap_count,
                 max_per_request, cfg,
                 has_type_filter, type_allowed,
                 decoded_count, max_messages,
                 gap_stop_now, verbose);
 
+            std::printf(">> RECOVERED: SequenceNumber=%llu, TotalRecovered=%llu\n",
+                        (unsigned long long)gap_start,
+                        (unsigned long long)recovered_count);
+
             if (gap_stop_now) {
-                std::printf("Stop: decoded_count=%llu\n", (unsigned long long)decoded_count);
+                std::printf(">> STOP: Total Decoded=%llu\n", (unsigned long long)decoded_count);
                 rr.close();
                 sock.close();
                 return 0;
             }
         }
 
+        // Decode the packet's message
+        bool stop_now = false;
+        decode_packet_messages(buffer, bytes, cfg, has_type_filter, type_allowed,
+                       decoded_count, max_messages, stop_now, verbose);
+
         // Expected next packet startseq
         expected_seq = header.sequence_number + (uint64_t)header.message_count;
 
         if (stop_now) {
-            std::printf("Stop: decoded_count=%llu\n", (unsigned long long)decoded_count);
+            std::printf(">> STOP: Total Decoded=%llu\n", (unsigned long long)decoded_count);
             sock.close();
             return 0;
         }
