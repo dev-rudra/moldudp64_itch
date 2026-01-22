@@ -186,6 +186,89 @@ static uint16_t decode_packet_messages(const uint8_t* buffer, int bytes,
     return processed;
 }
 
+// Gap-fill (Recover)
+static uint64_t gap_fill(Rerequester& rr, const char session[10],
+                         uint64_t start_seq, uint64_t gap_count,
+                         uint16_t max_per_request, const AppConfig& cfg,
+                         bool has_type_filter, const bool type_allowed[256],
+                         uint64_t& decoded_count, uint64_t max_messages,
+                         bool& stop_now, bool verbose) {
+
+    const int udp_packet_capacity = 64 * 1024;
+    uint8_t rxbuf[udp_packet_capacity];
+    
+    uint64_t recovered = 0;
+    uint64_t current_seq = start_seq;
+    uint64_t remaining = gap_count;
+
+    while (remaining > 0) {
+        uint16_t req_count = max_per_request;
+
+        if (remaining < (uint64_t)max_per_request) {
+            req_count = (uint16_t)remaining;
+        }
+
+        if (!rr.send_request(session, current_seq, req_count)) {
+            std::printf("Recovery send_request failed seq=%llu count=%u\n",
+                        (unsigned long long)current_seq,
+                        (unsigned)req_count);
+
+            break;
+        }
+
+        uint64_t got_in_chunk = 0;
+        int timeouts = 0;
+
+        while (got_in_chunk < (uint64_t)req_count) {
+            int recv_bytes = rr.receive_packet(rxbuf, udp_packet_capacity);
+            if (recv_bytes <= 0) {
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                    timeouts++;
+                    if (timeouts >= 3) {
+                        if (got_in_chunk == 0) {
+                            std::printf("Recovery timeout seq=%llu got=%llu req=%u\n",
+                                        (unsigned long long)current_seq,
+                                        (unsigned long long)got_in_chunk,
+                                        (unsigned)req_count);
+                        }
+                        break;
+                    }
+                    continue;
+                }
+                std::printf("Recovery recv error errno=%d\n", errno);
+                break;
+            }
+
+            bool local_stop = false;
+            uint16_t processed = decode_packet_messages(rxbuf, recv_bytes, cfg, has_type_filter,
+                                                       type_allowed, decoded_count, max_messages,
+                                                       local_stop, verbose);
+
+            got_in_chunk += (uint64_t)processed;
+
+            if (local_stop) {
+                stop_now = true;
+                return recovered + got_in_chunk;
+            }
+        }
+
+        if (got_in_chunk == 0) {
+            break;
+        }
+
+        recovered += got_in_chunk;
+        current_seq += got_in_chunk;
+
+        if (got_in_chunk >= remaining) {
+            remaining = 0;
+        } else {
+            remaining -= got_in_chunk;
+        }
+    }
+
+    return recovered;
+}
+
 int Application::run() {
     const char* config_path = "config/config.ini";
     if (!load_config(config_path)) {
@@ -359,6 +442,38 @@ int Application::run() {
     uint64_t expected_seq = 0;
     uint64_t decoded_count = 0;
 
+    // Open rerequester 
+    // only if enable_recovery
+    Rerequester rr;
+    bool rr_open = false;
+
+    uint16_t max_per_request = cfg.max_recovery_message_count;
+    if (max_per_request == 0) {
+        max_per_request = 5000;
+    }
+
+    if (enable_recovery) {
+        if (cfg.mcast_rerequester_ip.empty() || cfg.mcast_rerequester_port == 0) {
+            std::printf("Error: rerequester IP/Port not set in the config\n");
+            sock.close();
+            return 1;
+        }
+
+        int receive_buffer_bytes = 4 * 1024 * 1024;
+        int timeout_ms = 1000;
+
+        if (!rr.open(cfg.mcast_rerequester_ip, cfg.mcast_rerequester_port,
+                     receive_buffer_bytes, timeout_ms)) {
+
+            std::printf("Error: failed to open rerequester socket\n");
+            sock.close();
+            return 1;
+        }
+
+        rr_open = true;
+        std::printf("Recovery live mode enabled\n");
+    }
+
     std::printf("Listening... (Ctrl+C to stop)\n");
 
     while (1) {
@@ -379,6 +494,45 @@ int Application::run() {
         bool stop_now = false;
         decode_packet_messages(buffer, bytes, cfg, has_type_filter, type_allowed,
                                decoded_count, max_messages, stop_now, verbose);
+
+        // Gap-fill
+        if (enable_recovery && rr_open && joined &&
+            header.session == current_session &&
+            header.sequence_number > expected_seq) {
+
+            uint64_t gap_start = expected_seq;
+            uint64_t gap_count = header.sequence_number - expected_seq;
+
+            // use sessionId from current
+            // live packet
+            char session[10];
+            std::memset(session, ' ', 10);
+
+            size_t session_length = header.session.size();
+            if (session_length > 10) {
+                session_length = 10;
+            }
+
+            std::memcpy(session, header.session.data(), session_length);
+
+            std::printf("Recovery gap_fill start=%llu missing=%llu\n",
+                        (unsigned long long)gap_start,
+                        (unsigned long long)gap_count);
+
+            bool gap_stop_now = false;
+            gap_fill(rr, session, gap_start, gap_count,
+                max_per_request, cfg,
+                has_type_filter, type_allowed,
+                decoded_count, max_messages,
+                gap_stop_now, verbose);
+
+            if (gap_stop_now) {
+                std::printf("Stop: decoded_count=%llu\n", (unsigned long long)decoded_count);
+                rr.close();
+                sock.close();
+                return 0;
+            }
+        }
 
         // Expected next packet startseq
         expected_seq = header.sequence_number + (uint64_t)header.message_count;
