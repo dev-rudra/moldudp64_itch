@@ -484,7 +484,9 @@ int Application::run() {
         }
 
         // Gap/Duplicate/SessionChange
-        check_sequence_gap(header, current_session, joined, expected_seq);
+        if (enable_recovery) {
+            check_sequence_gap(header, current_session, joined, expected_seq);
+        }
 
         // Gap-fill
         if (enable_recovery && rr_open && joined &&
