@@ -20,6 +20,11 @@ static void usage(const char* prog) {
 }
 
 int main(int argc, char** argv) {
+    // Make stdout/stderr
+    // buffered with piped
+    std::setvbuf(stdout, 0, _IOLBF, 0);
+    std::setvbuf(stderr, 0, _IOLBF, 0);
+
     uint64_t max_messages = 0;
     bool verbose = false;
     bool enable_recovery = false;
