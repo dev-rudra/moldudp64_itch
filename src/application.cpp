@@ -54,9 +54,7 @@ static void check_sequence_gap(const MoldHeader& header,
     }
 
     if (header.session != current_session) {
-        std::printf("Session Change from =%.*s to=%.*s seq=%llu\n",
-                    (int)current_session.size(), current_session.c_str(),
-                    (int)header.session.size(), header.session.c_str(),
+        std::printf(">> INFO: SESSION_CHANGE SequenceNum=%llu\n",
                     (unsigned long long)header.sequence_number);
 
         current_session = header.session;
@@ -65,18 +63,16 @@ static void check_sequence_gap(const MoldHeader& header,
     }
 
     if (header.sequence_number > expected_seq) {
-        uint64_t missing = header.sequence_number - expected_seq;
-        std::printf("Gap session=%.*s expected=%llu got=%llu missing=%llu\n",
-                    (int)header.session.size(), header.session.c_str(),
+        uint64_t gap_count = header.sequence_number - expected_seq;
+        std::printf(">> GAP DETECT: ExpectedSequence=%llu, Received=%llu, TotalMissing=%llu\n",
                     (unsigned long long)expected_seq,
                     (unsigned long long)header.sequence_number,
-                    (unsigned long long)missing);
+                    (unsigned long long)gap_count);
         return;
     }
 
     if (header.sequence_number < expected_seq) {
-        std::printf("Duplicate session=%.*s expected=%llu got=%llu\n",
-                    (int)header.session.size(), header.session.c_str(),
+        std::printf(">> DUPLICATE: ExpectedSequence=%llu Received=%llu, Ignoring...\n",
                     (unsigned long long)expected_seq,
                     (unsigned long long)header.sequence_number);
         return;
