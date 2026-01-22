@@ -83,6 +83,51 @@ static void check_sequence_gap(const MoldHeader& header,
     }
 }
 
+// Connect to multicast feed, read first valid Mold header
+// return session id for:
+// -s : get session for rerequest packet
+// -g : recovery mode
+static bool get_session_id(const AppConfig& cfg, char session[10],
+                           std::string& session_value) {
+
+    std::memset(session, ' ', 10);
+    session_value.clear();
+
+    Socket sock;
+    if (!sock.connect_socket(cfg.mcast_ip, cfg.mcast_port, cfg.interface_ip, cfg.mcast_source_ip)) {
+        std::printf("Failed to connect multicast socket\n");
+        return false;
+    }
+
+    sock.set_receive_buffer(4 * 1024 * 1024);
+    const int udp_packet_capacity = 64 * 1024;
+    uint8_t buffer[udp_packet_capacity];
+
+    while (1) {
+        int bytes = sock.receive_bytes(buffer, udp_packet_capacity);
+        if (bytes <= 0) {
+            continue;
+        }
+
+        MoldHeader header;
+        if (!parse_mold_header(buffer, bytes, &header)) {
+            continue;
+        }
+
+        session_value = header.session;
+
+        std::memset(session, ' ', 10);
+        size_t session_len = header.session.size();
+        if (session_len > 10) {
+            session_len = 10;
+        }
+
+        std::memcpy(session, header.session.data(), session_len);
+
+        sock.close();
+        return true;
+    }
+}
 
 // Purpose:
 // Wrapper to decode a full MoldUDP packet (header + payload (all messages))
@@ -163,41 +208,14 @@ int Application::run() {
         // Get valid SessionId from first valid live Mold header
         // To send the rerequest packet to.
         char session[10];
-        std::memset(session, ' ', sizeof(session));
+        std::string session_value;
 
-        Socket live_sock;
-        if (!live_sock.connect_socket(cfg.mcast_ip, cfg.mcast_port, cfg.interface_ip, cfg.mcast_source_ip)) {
-            std::printf("Failed to connect multicast socket\n");
+        if (!get_session_id(cfg, session, session_value)) {
+            std::printf("Failed to get SessionID\n");
             return 1;
         }
 
-        live_sock.set_receive_buffer(4 * 1024 * 1024);
         const int udp_packet_capacity = 64 * 1024;
-        uint8_t live_buf[udp_packet_capacity];
-
-        std::printf("Getting SessionID...\n");
-
-        while (1) {
-            int bytes = live_sock.receive_bytes(live_buf, udp_packet_capacity);
-            if (bytes <= 0) {
-                continue;
-            }
-
-            MoldHeader header;
-            if (!parse_mold_header(live_buf, bytes, &header)) {
-                continue;
-            }
-
-            if (header.session.size() < 10) {
-                continue;
-            }
-
-            std::memcpy(session, header.session.data(), 10);
-            std::printf("Session found: %.*s\n", 10, session);
-            break;
-        }
-
-        live_sock.close();
 
         // Open rerequester Socket
         // Send request + receive reply
@@ -231,10 +249,6 @@ int Application::run() {
 
         uint8_t rxbuf[udp_packet_capacity];
 
-        std::printf("Recovery download start_seq=%llu max_per_request=%u\n",
-                    (unsigned long long)start_seq,
-                    (unsigned)max_per_request);
-
         while (!bounded_download || remaining > 0) {
             uint16_t req_count = max_per_request;
             if (bounded_download) {
@@ -246,13 +260,13 @@ int Application::run() {
             // Send rerequest for 
             // [current_seq ... current_seq + req_count -1]
             if (!rr.send_request(session, current_seq, req_count)) {
-                std::printf("Recovery send_request failed seq=%llu count=%u\n",
+                std::printf(">> ERROR : Recovery Request Send  Failed Sequence=%llu, Count=%u\n",
                             (unsigned long long)current_seq, (unsigned)req_count);
                 rr.close();
                 return 1;
             }
 
-            std::printf("Recovery request sent=%llu count=%u\n",
+            std::printf(">> INFO : Requesting... Sequence Number=%llu, Total Message=%u\n",
                         (unsigned long long)current_seq, (unsigned)req_count);
 
             // Receive reply packets
@@ -290,7 +304,7 @@ int Application::run() {
                 got_in_chunk += (uint64_t)processed;
 
                 if (stop_now) {
-                    std::printf("Stop: decoded_count=%llu\n", (unsigned long long)decoded_count);
+                    std::printf(">> STOP : Total Decoded Messages=%llu\n", (unsigned long long)decoded_count);
                     rr.close();
                     return 0;
                 }
